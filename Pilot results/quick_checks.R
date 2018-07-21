@@ -17,6 +17,10 @@ str(pilot)
 hist(pilot$Duration..in.seconds.,
      breaks = seq(0,1200,30))
 
+summary(pilot$Q2_Page.Submit)
+hist(pilot$Q2_Page.Submit,
+     breaks = seq(0,630,30))
+
 table(pilot$Q8) # correct is 2
 table(pilot$Q6) # correct is 3
 table(pilot$Q7) # correct is 3
@@ -30,20 +34,20 @@ table(pilot$Q8_correct, pilot$Q6_correct, pilot$Q7_correct)
 pilot$n_correct_answers <- pilot$Q8_correct + pilot$Q6_correct + pilot$Q7_correct
 table(pilot$n_correct_answers)
 
-View(pilot[pilot$n_correct_answers==3,]$Q5)
-View(pilot[pilot$n_correct_answers==2,]$Q5)
+#View(pilot[pilot$n_correct_answers==3,]$Q5)
+#View(pilot[pilot$n_correct_answers==2,]$Q5)
 
 pilot <- merge(pilot, Q5_rating[,c("mTurkCode","Q5_rating")], by = "mTurkCode")
-pilot$Duration_gt_60sec <- ifelse(pilot$Duration..in.seconds. < 60, 0, 1)
+pilot$Duration_gt_60sec <- ifelse(pilot$Q2_Page.Submit < 60, 0, 1)
 
 table(pilot$Q5_rating)
 table(pilot$Q5_rating, pilot$n_correct_answers)
 table(pilot$Q5_rating, pilot$Duration_gt_60sec)
-summary(pilot$Duration..in.seconds.)
-summary(pilot[pilot$Q5_rating>0,]$Duration..in.seconds.)
-View(pilot[pilot$Duration_gt_60sec==0,])
+summary(pilot$Q2_Page.Submit)
+summary(pilot[pilot$Q5_rating>0,]$Q2_Page.Submit)
+#View(pilot[pilot$Duration_gt_60sec==0,])
 
-pilot$pass <- (pilot$Duration..in.seconds. >= 60) & (pilot$Q5_rating > 0) & (pilot$n_correct_answers > 0)+0
+pilot$pass <- (pilot$Q2_Page.Submit >= 60) & (pilot$Q5_rating > 0) & (pilot$n_correct_answers > 0)+0
 table(pilot$pass)
 table(pilot$Q4, pilot$pass)
 
@@ -62,7 +66,7 @@ hist(pilot[pilot$pass==1,]$Q4,
      xlab = "Rating",
      ylab = "Number of responses",
      main = "Ratings for the cleaned dataset")
-
+dev.off()
 summary(pilot$Q4)
 
 pilot %>% 
