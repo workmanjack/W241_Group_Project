@@ -17,16 +17,17 @@ To what degree, if any, do reviews influence an individual’s perception of a s
 
 ### Parameters:
 
- * Rating: 1 to 6
- * Negative text reviews:
+#### Rating: 1 to 6
+
+#### Negative text reviews:
 
  <ul><li>It is an okay story to read for one time. </li><li>It was a little convoluted story, didn't feel the suspense. </li></ul>
 
- - Positive text reviews:
+#### Positive text reviews:
 
 <ul><li>That was both bizarre and amazing. </li><li>It was entertaining, creative to be sure. </li></ul>
 
- - Reading comprehension questions:
+#### Reading comprehension questions:
 
   1. What city was Gaius defending
  <ul><li>Babylon</li><li>Alexandria</li><li>Jerusalem</li><li>Rome</li></ul>
@@ -35,7 +36,7 @@ To what degree, if any, do reviews influence an individual’s perception of a s
   3. What happened at the end of the story?
  <ul><li>Gaius was killed</li><li>Gaius won the battle</li><li>Gaius killed the historian</li><li>Gaius traveled in time</li></ul>
 
-### Sample size:
+#### Sample size:
 
  - Minimum: 50 valid observations per cell
  - Request on Mechanical Turk: 100 to compensate for invalid responses
