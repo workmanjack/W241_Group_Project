@@ -29,7 +29,7 @@ To what degree, if any, do reviews influence an individual’s perception of a s
 
 #### Reading comprehension questions:
 
-  1. What city was Gaius defending
+  1. What city was Gaius defending?
  <ul><li>Babylon</li><li>Alexandria</li><li>Jerusalem</li><li>Rome</li></ul>
   2. How did the historian describe enemy's elephants?
  <ul><li>Petrifying</li><li>Epic</li><li>Beautiful</li><li>Menacing</li></ul>
@@ -39,6 +39,6 @@ To what degree, if any, do reviews influence an individual’s perception of a s
 #### Sample size:
 
  - Minimum: 50 valid observations per cell
- - Request on Mechanical Turk: 100 to compensate for invalid responses
+ - Request on Mechanical Turk: 100 `master` responses to compensate for invalid responses
  - Power: 90%
  - Expected ATE: 1 point in score difference between each treamtment cell and control
