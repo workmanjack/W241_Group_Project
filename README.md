@@ -6,6 +6,7 @@ To what degree, if any, do reviews influence an individual’s perception of a s
 
 ### Suggested experiment design
 
+|--------------|---------------------------------------|---------------------------------------|---------------------------------------|
 | Pages        | Control                               | Treatment 1 (low rating)              | Treatment 2 (high rating)             |
 |--------------|---------------------------------------|---------------------------------------|---------------------------------------|
 | Introduction | - Brief explanation of what to expect | - Brief explanation of what to expect | - Brief explanation of what to expect |
@@ -17,4 +18,5 @@ To what degree, if any, do reviews influence an individual’s perception of a s
 | Questions    | - Rate the story                      | - Rate the story                      | - Rate the story                      |
 |              | - Write a brief review                | - Write a brief review                | - Write a brief review                |
 |              | - 3 reading comprehension questions   | - 3 reading comprehension questions   | - 3 reading comprehension questions   |
+|--------------|---------------------------------------|---------------------------------------|---------------------------------------|
 
