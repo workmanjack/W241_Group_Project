@@ -77,7 +77,7 @@ t.test(Q4 ~ pass, data=pilot)
 
 summary(pilot[pilot$pass==1,]$Q4)
 # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#1.000   3.000   4.000   3.964   5.000   6.000 
+#  1.000   3.000   4.000   3.941   5.000   6.000 
 
 
 
@@ -91,5 +91,5 @@ beta <- 0.1 # 1-power
 # Built-in formula
 d = ate/sigma # assuming sigma is pooled standard deviation (equal variance)
 pwr.t.test(d = d, sig.level = alpha, power = 1-beta, type = 'two.sample', alternative = 'greater')
-# 34 responses in each bucket
+# 42 responses in each bucket
 
