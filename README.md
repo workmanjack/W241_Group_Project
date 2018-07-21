@@ -17,8 +17,8 @@ To what degree, if any, do reviews influence an individual’s perception of a s
 
 ### Parameters:
 
- - Rating: 1 to 6
- - Negative text reviews:
+ * Rating: 1 to 6
+ * Negative text reviews:
 
  <ul><li>It is an okay story to read for one time. </li><li>It was a little convoluted story, didn't feel the suspense. </li></ul>
 
