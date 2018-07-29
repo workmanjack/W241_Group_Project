@@ -1,0 +1,70 @@
+---
+title: "W241 Final Project Experiment Results"
+author: "Jack Workman & Yulia Zamriy"
+date: "July 29, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# load packages 
+library(data.table)
+```
+
+## Load the Data
+
+Survey responses were sourced from three different environments:
+1. Amazon Mechanical Turk with Masters qualification
+2. Amazon Mechanical Turk without Masters qualification
+3. Friends & Family (Facebook, LinkedIn, I School Slack)
+
+Although this step is not critical for analyzing the results of the experiment, it might be interesting to know later on where a subject was recruited from. So, here we pre-process the data to explicitly identify each subject's group. We do that by matching the mTurkCOde from the Amazon Mechanical Turk (mturk) responses to the mTurkCode in the qualtrics data set.
+
+
+```{r load_data}
+mturk_masters = read.csv("experiment_results/mturk_W241_Final-Project_Survey_Masters-Batch_Results.csv")
+mturk_regulars = read.csv("experiment_results/mturk_W241_Final-Project_Survey_Non-Masters-Batch_Results.csv")
+qualtrics = read.csv("experiment_results/qualtrics_W241_Final-Project_Survey_Experiment_July-29-2018_12-59.csv")
+```
+
+## Concatenate MTurk Masters & MTurk Regulars
+
+```{r}
+# assign groups
+mturk_masters['source_group'] = 1 
+mturk_regulars['source_group'] = 2
+mturk_all = rbind(mturk_masters, mturk_regulars)
+
+# keep these columns and drop the rest (switched to reverse where we explicitly drop the not necessary ones so that we are more clear about what we are dropping)
+#mturk_cols_to_keep = c('HITId', 'CreationTime', 'Expiration', 'AssignmentId', 'WorkerId', 'AssignmentStatus', 'AcceptTime', 'SubmitTime', 'WorkTimeInSeconds', 'LifetimeApprovalRate', 'Last30DaysApprovalRate', 'Last7DaysApprovalRate', 'Answer.surveycode', 'source_group')
+#mturk_all = mturk_all[mturk_cols_to_keep]
+
+# drop unnecessary columns
+mturk_all = subset(mturk_all, select = -c(HITTypeId, Title, Description, Keywords, Reward, MaxAssignments, RequesterAnnotation, AssignmentDurationInSeconds, AutoApprovalDelayInSeconds, NumberOfSimilarHITs, LifetimeInSeconds, AssignmentId, AutoApprovalTime, ApprovalTime, RejectionTime, RequesterFeedback, Approve, Reject))
+
+# rename mTurkCode column to match qualtrics
+mturk_all['mTurkCode'] = mturk_all['Answer.surveycode']
+
+# check out the combined dataset
+head(mturk_all)
+unique(mturk_all['source_group'])
+dim(mturk_all)
+```
+
+## Merge MTurk and Qualtrics Datasets
+
+```{r}
+head(qualtrics)
+responses = merge(x = qualtrics, y = mturk_all, by = "mTurkCode", all.x = TRUE)
+head(responses)
+#colnames(responses)
+responses$source_group[is.na(responses$source_group)] = 3
+unique(responses['source_group'])
+hist(responses$source_group, breaks=3) # could probably make this prettier
+table(responses$source_group)
+
+```
+
+
+
