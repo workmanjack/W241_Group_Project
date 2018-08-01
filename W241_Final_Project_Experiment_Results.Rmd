@@ -1,0 +1,223 @@
+---
+title: "W241 Final Project Experiment Results"
+author: "Jack Workman & Yulia Zamriy"
+date: "July 29, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# load packages
+library(lmtest) 
+library(knitr)
+library(data.table)
+library(ggplot2)
+```
+
+## Load the Data
+
+Survey responses were sourced from three different environments:
+1. Amazon Mechanical Turk with Masters qualification
+2. Amazon Mechanical Turk without Masters qualification
+3. Friends & Family (Facebook, LinkedIn, I School Slack)
+
+Although this step is not critical for analyzing the results of the experiment, it might be interesting to know later on where a subject was recruited from. So, here we pre-process the data to explicitly identify each subject's group. We do that by matching the mTurkCOde from the Amazon Mechanical Turk (mturk) responses to the mTurkCode in the qualtrics data set.
+
+
+```{r load_data}
+mturk_masters = read.csv("experiment_results/mturk_W241_Final-Project_Survey_Masters-Batch_Results.csv")
+mturk_regulars = read.csv("experiment_results/mturk_W241_Final-Project_Survey_Non-Masters-Batch_Results.csv")
+
+# the second and third rows of the qualtrics results contain meta info we do not need so we remove it here
+all_content = readLines("experiment_results/qualtrics_W241_Final-Project_Survey_Experiment_July-31-2018_00-01.csv")
+all_content = all_content[-3]
+all_content = all_content[-2]
+qualtrics = read.csv(textConnection(all_content), header = TRUE)
+# thank you: https://stackoverflow.com/questions/15860071/read-csv-header-on-first-line-skip-second-line
+```
+
+## Concatenate MTurk Masters & MTurk Regulars
+
+```{r}
+# assign groups
+mturk_masters['source_group'] = 1 
+mturk_regulars['source_group'] = 2
+mturk_all = rbind(mturk_masters, mturk_regulars)
+
+# keep these columns and drop the rest (switched to reverse where we explicitly drop the not necessary ones so that we are more clear about what we are dropping)
+#mturk_cols_to_keep = c('HITId', 'CreationTime', 'Expiration', 'AssignmentId', 'WorkerId', 'AssignmentStatus', 'AcceptTime', 'SubmitTime', 'WorkTimeInSeconds', 'LifetimeApprovalRate', 'Last30DaysApprovalRate', 'Last7DaysApprovalRate', 'Answer.surveycode', 'source_group')
+#mturk_all = mturk_all[mturk_cols_to_keep]
+
+# drop unnecessary columns
+mturk_all = subset(mturk_all, select = -c(HITTypeId, Title, Description, Keywords, Reward, MaxAssignments, RequesterAnnotation, AssignmentDurationInSeconds, AutoApprovalDelayInSeconds, NumberOfSimilarHITs, LifetimeInSeconds, AssignmentId, AutoApprovalTime, ApprovalTime, RejectionTime, RequesterFeedback, Approve, Reject))
+
+# rename mTurkCode column to match qualtrics
+mturk_all['mTurkCode'] = mturk_all['Answer.surveycode']
+
+# check out the combined dataset
+#head(mturk_all)
+unique(mturk_all['source_group'])
+dim(mturk_all)
+```
+
+## Merge MTurk and Qualtrics Datasets
+
+```{r}
+#head(qualtrics)
+responses = merge(x = qualtrics, y = mturk_all, by = "mTurkCode", all.x = TRUE)
+#head(responses)
+#colnames(responses)
+responses$source_group[is.na(responses$source_group)] = 3
+unique(responses['source_group'])
+hist(responses$source_group, breaks=3) # could probably make this prettier
+table(responses$source_group)
+```
+
+## Check Validity of Responses
+
+```{r}
+short_story_word_count = 990
+duration_secs_minimum = 60
+correct_answers_minimum = 1
+```
+
+This experiment relies entirely on the assumption that the subjects read the short story. To ensure this, we added several validation checks to the survey. 
+
+First, a timer to track how long each participant spends on the short story page itself. The short story is `r short_story_word_count` words, so any subject with less than `r duration_secs_minimum`, a reading speed of `r round(short_story_word_count / duration_secs_minimum / 60, 2)` will be dropped. Given that [the adult average reading speed is about 200 wpm](https://en.wikipedia.org/wiki/Words_per_minute#Reading_and_comprehension)), we believe that this is more than justified. 
+
+Second, the survey contains three reading comprehension questions to test the reader's understanding of the story. These questions are designed to be extremely basic and high-level. In fact, the questions were made easier after the pilot as those were deemed to be too difficult. If the subject read the story, then they should be able to answer these questions. Since no one is perfect, we are electing to keep all subjects that answered at least `r correct_answers_minimum` answer correctly. We drop the rest.
+
+Finally, we will be dropping any subject that failed to answer all questions in the survey.
+
+```{r}
+valid_responses = responses
+
+nrows_before = nrow(valid_responses)
+
+# reading time check
+valid_responses = subset(valid_responses, Q2_Page.Submit >= duration_secs_minimum)
+
+dropped_duration = nrows_before - nrow(valid_responses)
+nrows_dropped_duration = nrow(valid_responses)
+
+# reading questions check
+Q12_correct_ans = 'Beautiful'
+Q14_correct_ans = 'Rome'
+Q16_correct_ans = 'Gaius was killed'
+valid_responses['Q12_correct'] = ifelse(valid_responses$Q12 == Q12_correct_ans, 1, 0)
+valid_responses['Q14_correct'] = ifelse(valid_responses$Q14 == Q14_correct_ans, 1, 0)
+valid_responses['Q16_correct'] = ifelse(valid_responses$Q12 == Q16_correct_ans, 1, 0)
+valid_responses['correct_answers'] = valid_responses$Q12_correct + valid_responses$Q14_correct + valid_responses$Q16_correct
+valid_responses = subset(valid_responses, correct_answers >= correct_answers_minimum)
+
+dropped_correct_ans = nrows_dropped_duration - nrow(valid_responses)
+nrows_correct_ans = nrow(valid_responses)
+
+# answered all questions check
+valid_responses = subset(valid_responses, Q4 != '')
+valid_responses = subset(valid_responses, Q5 != '')
+valid_responses = subset(valid_responses, Q12 != '')
+valid_responses = subset(valid_responses, Q14 != '')
+valid_responses = subset(valid_responses, Q16 != '')
+valid_responses = subset(valid_responses, Q25 != '')
+
+dropped_no_answer = nrows_correct_ans - nrow(valid_responses)
+nrows_no_answer = nrow(valid_responses)
+
+nrows_after = nrow(valid_responses)
+```
+
+```{r}
+labels = c('Starting Num\nResponses', sprintf('Reading Duration\n>= %s secs', duration_secs_minimum), sprintf('Num Correct\nAnswers >= %s', correct_answers_minimum), 'All questions\nanswered', 'Final Count')
+desc = factor(labels, levels=labels)
+type = c('in', 'out', 'out', 'out', 'in')
+type = factor(type, levels = c("out", "in"))
+start = c(0, nrows_before, nrows_dropped_duration, nrows_correct_ans, nrows_no_answer)
+end = c(nrows_before, nrows_dropped_duration, nrows_correct_ans, nrows_after, 0)
+amount = c(nrows_before, -dropped_duration, -dropped_correct_ans, -dropped_no_answer, -nrows_after)
+id = seq_along(amount)
+waterfall_data = data.frame(id, desc, type, start, end, amount)
+
+waterfall_plot = ggplot(waterfall_data, aes(desc, fill = type)) + geom_rect(aes(x = desc,
+       xmin = id - 0.45, xmax = id + 0.45, ymin = end,
+       ymax = start))
+waterfall_plot + ggtitle("Responses Dropped") + theme(plot.title = element_text(hjust = 0.5)) + labs(y="Number of Responses", x = "Dropping Reason")
+```
+
+## Identify Treatment and Control Groups
+
+There are three distinct groups in this experiment:
+
+1. Control
+2. Treatment - Low Rating
+3. Treatment - High Rating
+
+```{r}
+valid_responses['experiment_group'] = ifelse(valid_responses$FL_2_DO == 'Introduction:Control', 1, 
+                                       ifelse(valid_responses$FL_2_DO == 'Introduction:1Star', 2,
+                                              ifelse(valid_responses$FL_2_DO == 'Introduction:4.5Stars', 3, -1)))
+valid_responses['treated'] = ifelse(valid_responses$experiment_group == 2, 1,
+                                       ifelse(valid_responses$experiment_group == 3, 1, 0))
+valid_responses['treatment_rating'] = ifelse(valid_responses$experiment_group == 2, 2,
+                                       ifelse(valid_responses$experiment_group == 3, 5, NA))
+```
+
+
+## Calculate ATE
+
+```{r}
+calc_exp_group_avg_rating = function(data, group) {
+  avg_rating = mean(subset(data, experiment_group == group)$Q4)
+  return(avg_rating)
+}
+get_nrow_of_group = function(data, group) {
+  rows = nrow(subset(data, experiment_group == group))
+  return(rows)
+}
+get_pct_subjects_of_group = function(data, group) {
+  count = get_nrow_of_group(data, group)
+  pct = round(count / nrow(data) * 100, 2)
+  return(pct)
+}
+control_avg_rating = calc_exp_group_avg_rating(valid_responses, 1)
+treatment_low_avg_rating = calc_exp_group_avg_rating(valid_responses, 2)
+treatment_high_avg_rating = calc_exp_group_avg_rating(valid_responses, 3)
+# todo: is this actually how you calculate ATE?
+ate_high = treatment_high_avg_rating - control_avg_rating
+ate_low = treatment_low_avg_rating - control_avg_rating
+groups = c(
+  'Control',
+  'Treatment - Low Rating',
+  'Treatment - High Rating')
+counts = c(
+  get_nrow_of_group(valid_responses, 1),
+  get_nrow_of_group(valid_responses, 2),
+  get_nrow_of_group(valid_responses, 3))
+pcts = c(
+  get_pct_subjects_of_group(valid_responses, 1),
+  get_pct_subjects_of_group(valid_responses, 2),
+  get_pct_subjects_of_group(valid_responses, 3))
+avg_ratings = c(
+  control_avg_rating,
+  treatment_low_avg_rating,
+  treatment_high_avg_rating)
+ates = c(
+  0,
+  ate_low,
+  ate_high)
+treated_ratings = c('na', '2/6 Stars', '5/6 Stars')
+outcome_table = data.frame(groups, counts, pcts, treated_ratings, avg_ratings, ates)
+kable(outcome_table, col.names = c('Group', '# of Subjects', '% of Total Subjects', 'Treated Rating', 'AVG Rating', 'ATE'))
+```
+
+## Model
+
+```{r}
+# todo: is treatment_rating a binary variable? why is treatment rating of 2 not showing up in summary?
+model = lm(Q4 ~ factor(treatment_rating), data = valid_responses, subset = (treated == 1))
+summary(model)
+coefci(model)
+```
+
+
