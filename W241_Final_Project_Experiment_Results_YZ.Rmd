@@ -1,0 +1,532 @@
+---
+title: "W241 Final Project Experiment Results"
+author: "Jack Workman & Yulia Zamriy"
+date: \today 
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# load packages
+library(lmtest) 
+library(knitr)
+library(data.table)
+library(tidyverse)
+separator <- paste(rep("=",70), collapse = "")
+```
+
+
+## 1. Pilot Study
+
+TODO
+
+## 2. Getting the Data
+
+### 2.1 Load the Data
+
+Survey responses were sourced from three different environments:
+1. Amazon Mechanical Turk with Masters qualification
+2. Amazon Mechanical Turk without Masters qualification
+3. Friends & Family (Facebook, LinkedIn, I School Slack)
+
+Although this step is not critical for analyzing the results of the experiment, it might be interesting to know later on where a subject was recruited from. So, here we pre-process the data to explicitly identify each subject's group. We do that by matching the mTurkCOde from the Amazon Mechanical Turk (mturk) responses to the mTurkCode in the qualtrics data set.
+
+
+```{r load_data}
+mturk_masters = 
+  read.csv("experiment_results/mturk_W241_Final-Project_Survey_Masters-Batch_Results.csv")
+mturk_regulars = 
+  read.csv("experiment_results/mturk_W241_Final-Project_Survey_Non-Masters-Batch_Results.csv")
+
+# the second and third rows of the qualtrics results contain meta info 
+# we do not need so we remove it here
+all_content = 
+  readLines("experiment_results/qualtrics_W241_Final-Project_Survey_Experiment_August-1-2018_14-06.csv")
+all_content = all_content[-3]
+all_content = all_content[-2]
+qualtrics = read.csv(textConnection(all_content), header = TRUE, stringsAsFactors = FALSE)
+rm(all_content)
+# thank you: https://stackoverflow.com/questions/15860071/read-csv-header-on-first-line-skip-second-line
+```
+
+### 2.2 Concatenate MTurk Masters & MTurk Regulars
+
+```{r}
+# assign groups
+mturk_masters['source_group'] = 1 
+mturk_regulars['source_group'] = 2
+mturk_all = rbind(mturk_masters, mturk_regulars)
+
+# keep these columns and drop the rest (switched to reverse where we explicitly drop the not necessary ones so that we are more clear about what we are dropping)
+#mturk_cols_to_keep = c('HITId', 'CreationTime', 'Expiration', 'AssignmentId', 'WorkerId', 'AssignmentStatus', 'AcceptTime', 'SubmitTime', 'WorkTimeInSeconds', 'LifetimeApprovalRate', 'Last30DaysApprovalRate', 'Last7DaysApprovalRate', 'Answer.surveycode', 'source_group')
+#mturk_all = mturk_all[mturk_cols_to_keep]
+
+# drop unnecessary columns
+mturk_all = subset(mturk_all, select = -c(HITTypeId, Title, Description, Keywords, 
+                                          Reward, MaxAssignments, RequesterAnnotation, 
+                                          AssignmentDurationInSeconds, AutoApprovalDelayInSeconds, 
+                                          NumberOfSimilarHITs, LifetimeInSeconds, AssignmentId, 
+                                          AutoApprovalTime, ApprovalTime, RejectionTime, 
+                                          RequesterFeedback, Approve, Reject))
+
+# rename mTurkCode column to match qualtrics
+mturk_all['mTurkCode'] = mturk_all['Answer.surveycode']
+
+# check out the combined dataset
+#head(mturk_all)
+table(mturk_all['source_group'])
+dim(mturk_all)
+```
+
+### 2.3 Merge MTurk and Qualtrics Datasets
+
+```{r}
+#head(qualtrics)
+responses = merge(x = qualtrics, y = mturk_all, by = "mTurkCode", all.x = TRUE)
+dim(responses)
+table(responses$source_group)
+#head(responses)
+#colnames(responses)
+responses$source_group[is.na(responses$source_group)] = 3
+responses$source_group <- factor(responses$source_group, labels = c("Mturk Masters", "Mturk Regulars", "F&F"))
+#hist(responses$source_group, breaks=3) # could probably make this prettier
+table(responses$source_group)
+```
+
+```{r}
+rm(list = c('mturk_all', 'mturk_masters', 'mturk_regulars', 'qualtrics'))
+```
+
+## 3. Data Cleaning
+
+### 3.1 Identifying Invalid Data Rows
+
+Potentially invalid responses are those that:
+
+ - have `Status` = 'Spam' or 'Survey Preview'
+ - Duplicate `IPAddress` occurance. We'll keep the first response for the analysis (alternatively, we can exclude all of them)
+ - not finished (progress less than 100%). These cases need to be investigated for potential bias
+
+
+#### 3.1.1 Invalid Status
+
+```{r}
+table(responses$Status)
+```
+
+#### 3.1.2 Duplicate IP Addresses
+
+```{r}
+# record duplicate IP Addresses and first timestamp
+responses %>% 
+  group_by(IPAddress) %>% 
+  arrange(StartDate) %>% 
+  summarize(ip_count = n(),
+            StartDate = first(StartDate)) %>% 
+  filter(ip_count > 1) -> duplicate_ips
+
+# merge duplicate IP Addresses based on first time stamp
+responses <- merge(x = responses, y = duplicate_ips, 
+               by = c("IPAddress", "StartDate"), all.x = TRUE)
+# merge all duplicate IP Addresses
+responses <- merge(x = responses, y = duplicate_ips[,c("IPAddress", "ip_count")], 
+               by = "IPAddress", all.x = TRUE)
+
+responses$duplicate_ip <- 0
+responses[!is.na(responses$ip_count.y),]$duplicate_ip <- 1
+responses$duplicate_ip_xfirst <- 0
+responses[!is.na(responses$ip_count.x),]$duplicate_ip_xfirst <- 1
+responses$ip_count.x <- NULL
+colnames(responses)[colnames(responses)=="ip_count.y"] <- "ip_count"
+responses[is.na(responses$ip_count),]$ip_count <- 1
+rm(duplicate_ips)
+```
+
+```{r}
+table(responses$duplicate_ip, responses$duplicate_ip_xfirst)
+```
+
+
+
+```{r}
+table(responses$ip_count)
+```
+
+
+#### 3.1.3 Unfinished Surveys
+
+We have 70 responses that were not finished. We'll create a separate flag variable to determine if they are a cause for attrition concern:
+
+```{r, echo=FALSE}
+cat(separator)
+cat("\nSummary of survey's progress:\n")
+summary(responses$Progress)
+cat(separator)
+cat("\nNumber of responses that are not finished:\n")
+sum(responses$Progress < 100)
+cat(separator)
+cat("\nPrimary outcome distribution for unfinished responses:\n")
+table(responses[responses$Progress < 100,]$Q4)
+cat(separator)
+cat("\nSource of  unfinished responses:\n")
+table(responses[responses$Progress < 100,]$source_group)
+cat(separator)
+cat("\nTreatment assignment for unfinished responses:\n")
+table(responses[responses$Progress < 100,]$FL_2_DO)
+```
+
+#### 3.1.4 Putting It All Together
+
+```{r}
+responses$valid <- "Valid"
+responses[responses$Status %in% c("Spam", "Survey Preview"), ]$valid <- "Preview/Spam"
+responses[responses$duplicate_ip_xfirst==1,]$valid <- "Duplicate"
+responses[responses$Progress < 100,]$valid <- "Not Finished"
+table(responses$valid)
+```
+
+```{r, echo=FALSE}
+cat(separator)
+cat("\nSource of valid responses:\n")
+table(responses[responses$valid == "Valid",]$source_group)
+cat("\nSource of invalid responses:\n")
+table(responses[responses$valid != "Valid",]$source_group)
+cat(separator)
+cat("\nTreatment assignment for valid responses:\n")
+table(responses[responses$valid == "Valid",]$FL_2_DO)
+cat("\nTreatment assignment for invalid responses:\n")
+table(responses[responses$valid != "Valid",]$FL_2_DO)
+```
+
+```{r}
+table(responses[responses$valid == "Valid",]$FL_2_DO, 
+      responses[responses$valid == "Valid",]$source_group)
+```
+
+
+### 3.2 Are Valid Responses Actually Valid?
+
+```{r}
+short_story_word_count = 990
+duration_secs_minimum = 30
+correct_answers_minimum = 1
+```
+
+This experiment relies entirely on the assumption that the subjects read the short story. To ensure this, we added several validation checks to the survey. 
+
+First, a timer to track how long each participant spends on the short story page itself. The short story is `r short_story_word_count` words, so any subject with less than `r duration_secs_minimum`, a reading speed of `r round(short_story_word_count / duration_secs_minimum / 60, 2)` will be dropped. Given that [the adult average reading speed is about 200 wpm](https://en.wikipedia.org/wiki/Words_per_minute#Reading_and_comprehension)), we believe that this is more than justified. 
+
+Second, the survey contains three reading comprehension questions to test the reader's understanding of the story. These questions are designed to be extremely basic and high-level. In fact, the questions were made easier after the pilot as those were deemed to be too difficult. If the subject read the story, then they should be able to answer these questions. Since no one is perfect, we are electing to keep all subjects that answered at least `r correct_answers_minimum` answer correctly. We drop the rest.
+
+Finally, we will be dropping any subject that failed to answer all questions in the survey.
+
+
+```{r}
+valid_responses = subset(responses, valid == "Valid")
+```
+
+```{r}
+summary(valid_responses$Duration..in.seconds.)
+```
+```{r}
+sum(valid_responses$Duration..in.seconds. < 1200)
+```
+
+```{r}
+hist(valid_responses[valid_responses$Duration..in.seconds. < 1200,]$Duration..in.seconds.,
+     col = "darkgreen",
+     breaks = seq(0,1200,60),
+     ylim = c(0, 75),
+     xaxt = 'n',
+     xlab = "Time spent on the whole survey",
+     main = "Histogram of time spent on survey")
+axis(side = 1, at = seq(0,1200,60), labels = seq(0,1200,60), cex.axis = 0.5)
+```
+
+```{r}
+summary(valid_responses$Q2_Page.Submit)
+```
+
+```{r}
+sum(valid_responses$Q2_Page.Submit < 600)
+```
+
+```{r}
+hist(valid_responses[valid_responses$Q2_Page.Submit < 600,]$Q2_Page.Submit,
+     col = "darkgreen",
+     breaks = seq(0,600,30),
+     ylim = c(0, 150),
+     xaxt = 'n',
+     xlab = "Time spent on the story page",
+     main = "Histogram of time spent reading")
+axis(side = 1, at = seq(0,600,30), labels = seq(0,600,30), cex.axis = 0.6)
+```
+
+
+
+```{r}
+
+# reading time check
+#valid_responses = subset(valid_responses, Q2_Page.Submit >= duration_secs_minimum)
+valid_responses[valid_responses$Q2_Page.Submit < duration_secs_minimum,]$valid <- "Undertime"
+table(valid_responses$valid)
+```
+
+```{r}
+table(valid_responses$valid, valid_responses$FL_2_DO)
+```
+
+```{r}
+table(valid_responses$valid, valid_responses$source_group)
+```
+
+```{r}
+# reading questions check
+Q12_correct_ans = 'Beautiful'
+Q14_correct_ans = 'Rome'
+Q16_correct_ans = 'Gaius was killed'
+valid_responses['Q12_correct'] = ifelse(valid_responses$Q12 == Q12_correct_ans, 1, 0)
+valid_responses['Q14_correct'] = ifelse(valid_responses$Q14 == Q14_correct_ans, 1, 0)
+valid_responses['Q16_correct'] = ifelse(valid_responses$Q12 == Q16_correct_ans, 1, 0)
+valid_responses['correct_answers'] = valid_responses$Q12_correct + 
+  valid_responses$Q14_correct + valid_responses$Q16_correct
+table(valid_responses$correct_answers)
+```
+
+```{r}
+valid_responses[valid_responses$correct_answers < correct_answers_minimum,]$valid <- "Very incorrect"
+table(valid_responses$valid)
+```
+
+```{r}
+sum(valid_responses$Q4 == -99)
+```
+
+```{r}
+valid_responses[valid_responses$Q4 == -99,]$valid <- "Missing outcome"
+table(valid_responses$valid)
+```
+
+```{r}
+table(valid_responses$Q25)
+```
+
+
+```{r}
+valid_responses$issues <- "No issues"
+#valid_responses[valid_responses$Q25 == 'Yes',]$issues <- "Know the story"
+valid_responses[valid_responses$Q5 == '-99',]$issues <- "Missing text review"
+valid_responses[valid_responses$Q25 == '-99',]$issues <- "Missing answer"
+valid_responses[valid_responses$Q12 == '-99',]$issues <- "Missing answer"
+valid_responses[valid_responses$Q14 == '-99',]$issues <- "Missing answer"
+valid_responses[valid_responses$Q16 == '-99',]$issues <- "Missing answer"
+table(valid_responses$issues)
+```
+
+```{r}
+table(valid_responses$valid, valid_responses$issues)
+```
+
+```{r}
+nrows_raw <- nrow(responses)
+excl_dups_unfinished <- nrow(valid_responses)
+excl_dur_undertime <- excl_dups_unfinished - sum(valid_responses$valid == 'Undertime')
+excl_incorrect_answ <- excl_dur_undertime - sum(valid_responses$valid == 'Very incorrect')
+excl_missing_outcome <- excl_incorrect_answ - sum(valid_responses$valid == 'Missing outcome')
+nrows_final <- sum(valid_responses$valid == 'Valid')
+```
+
+
+```{r}
+labels = c('Raw Num\nResponses', 
+           'Duplicate IPs/Unfinished',
+           sprintf('Reading Duration\n>= %s secs', duration_secs_minimum), 
+           sprintf('Num Correct\nAnswers < %s', correct_answers_minimum), 
+           'Missing outcome answers', 
+           'Final Count')
+
+desc = factor(labels, levels=labels)
+type = c('in', 'out', 'maybe out', 'maybe out', 'out', 'in')
+type = factor(type, levels = c("in", "out", "maybe out"))
+
+start = c(0, nrows_raw, 
+          excl_dups_unfinished, 
+          excl_dur_undertime, 
+          excl_incorrect_answ, 
+          excl_missing_outcome)
+end = c(nrows_raw, 
+        excl_dups_unfinished, 
+        excl_dur_undertime, 
+        excl_incorrect_answ, 
+        nrows_final, 0)
+amount = c(nrows_raw, 
+           -excl_dups_unfinished, 
+           -excl_dur_undertime, 
+           -excl_incorrect_answ, 
+           -excl_missing_outcome, 
+           -nrows_final)
+id = seq_along(amount)
+waterfall_data = data.frame(id, desc, type, start, end, amount)
+
+label_names <- c(nrows_raw, 
+                 nrows_raw - excl_dups_unfinished,
+                 excl_dups_unfinished - excl_dur_undertime,
+                 excl_dur_undertime - excl_incorrect_answ,
+                 excl_incorrect_answ - excl_missing_outcome,
+                 nrows_final)
+
+adj <- 1.075
+label_pos <- c(nrows_raw * adj, 
+               excl_dups_unfinished * adj,
+               excl_dur_undertime * adj,
+               excl_incorrect_answ * adj,
+               excl_missing_outcome * adj,
+               nrows_final * adj)
+
+waterfall_plot = 
+  ggplot(waterfall_data, aes(desc, fill = type, 
+                             xmin = id - 0.45, xmax = id + 0.45, ymin = end, ymax = start, 
+                             label = label_names)) + 
+  geom_rect()
+waterfall_plot + 
+  ggtitle("Responses Dropped") + 
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.text.x = element_text(angle = 90, hjust = 1)) + 
+  labs(y="Number of Responses", x="Dropping Reason") +
+  geom_text(aes(y = label_pos, label = label_names))
+
+```
+
+```{r, echo=FALSE}
+rm(list = c("adj", "amount", "desc", "end", "id", "label_names", "label_pos", "labels", "start", "type"))
+rm(list = c("excl_dups_unfinished", "excl_dur_undertime", "excl_incorrect_answ"))
+rm(list = c("excl_missing_outcome", "nrows_final", "nrows_raw"))
+rm(list = c("Q12_correct_ans", "Q14_correct_ans", "Q16_correct_ans"))
+rm(list = c("correct_answers_minimum", "duration_secs_minimum", "short_story_word_count"))
+rm(list = c("waterfall_data", "waterfall_plot"))
+```
+
+
+## Identify Treatment and Control Groups
+
+There are three distinct groups in this experiment:
+
+1. Control
+2. Treatment - Low Rating
+3. Treatment - High Rating
+
+```{r}
+valid_responses['experiment_group'] = 
+  ifelse(valid_responses$FL_2_DO == 'Introduction:Control', 1, 
+         ifelse(valid_responses$FL_2_DO == 'Introduction:1Star', 2,
+                ifelse(valid_responses$FL_2_DO == 'Introduction:4.5Stars', 3, -1)))
+valid_responses['treated'] = ifelse(valid_responses$experiment_group == 2, 1,
+                                    ifelse(valid_responses$experiment_group == 3, 1, 0))
+valid_responses['treatment_rating'] = ifelse(valid_responses$experiment_group == 2, 2,
+                                       ifelse(valid_responses$experiment_group == 3, 5, NA))
+valid_responses['experiment_group_chr'] = 
+  ifelse(valid_responses$FL_2_DO == 'Introduction:Control', "Control", 
+         ifelse(valid_responses$FL_2_DO == 'Introduction:1Star', "Treat: Low",
+                ifelse(valid_responses$FL_2_DO == 'Introduction:4.5Stars', "Treat: High", "NA")))
+```
+
+```{r}
+table(valid_responses$experiment_group, valid_responses$experiment_group_chr)
+```
+
+
+```{r}
+summary(valid_responses$Q4)
+```
+
+```{r}
+summary(valid_responses[valid_responses$valid == "Valid",]$Q4)
+```
+
+```{r}
+valid_responses %>% 
+  filter(valid != "Missing outcome") %>% 
+  group_by(valid, FL_2_DO) %>% 
+  summarize(responseCount = n(),
+            avgRating = round(mean(Q4),1))
+```
+
+## Calculate ATE
+
+```{r}
+calc_exp_group_avg_rating = function(data, group) {
+  avg_rating = mean(subset(data, experiment_group == group)$Q4)
+  return(avg_rating)
+}
+get_nrow_of_group = function(data, group) {
+  rows = nrow(subset(data, experiment_group == group))
+  return(rows)
+}
+get_pct_subjects_of_group = function(data, group) {
+  count = get_nrow_of_group(data, group)
+  pct = round(count / nrow(data) * 100, 2)
+  return(pct)
+}
+control_avg_rating = calc_exp_group_avg_rating(valid_responses[valid_responses$valid == "Valid",], 1)
+treatment_low_avg_rating = calc_exp_group_avg_rating(valid_responses[valid_responses$valid == "Valid",], 2)
+treatment_high_avg_rating = calc_exp_group_avg_rating(valid_responses[valid_responses$valid == "Valid",], 3)
+# todo: is this actually how you calculate ATE?
+ate_high = treatment_high_avg_rating - control_avg_rating
+ate_low = treatment_low_avg_rating - control_avg_rating
+groups = c(
+  'Control',
+  'Treatment - Low Rating',
+  'Treatment - High Rating')
+counts = c(
+  get_nrow_of_group(valid_responses[valid_responses$valid == "Valid",], 1),
+  get_nrow_of_group(valid_responses[valid_responses$valid == "Valid",], 2),
+  get_nrow_of_group(valid_responses[valid_responses$valid == "Valid",], 3))
+pcts = c(
+  get_pct_subjects_of_group(valid_responses[valid_responses$valid == "Valid",], 1),
+  get_pct_subjects_of_group(valid_responses[valid_responses$valid == "Valid",], 2),
+  get_pct_subjects_of_group(valid_responses[valid_responses$valid == "Valid",], 3))
+avg_ratings = c(
+  round(control_avg_rating,2),
+  round(treatment_low_avg_rating,2),
+  round(treatment_high_avg_rating,2))
+ates = c(
+  0,
+  round(ate_low,2),
+  round(ate_high,2))
+treated_ratings = c('na', '2/6 Stars', '5/6 Stars')
+outcome_table = data.frame(groups, counts, pcts, treated_ratings, avg_ratings, ates)
+kable(outcome_table, col.names = 
+        c('Group', '# of Subjects', '% of Total Subjects', 'Treated Rating', 'AVG Rating', 'ATE'))
+```
+
+## Model
+
+```{r}
+model = lm(Q4 ~ experiment_group_chr, 
+           data = valid_responses[valid_responses$valid == "Valid",])
+summary(model)
+coefci(model)
+```
+
+```{r}
+model = lm(Q4 ~ experiment_group_chr, 
+           data = valid_responses[valid_responses$valid != "Missing outcome",])
+summary(model)
+coefci(model)
+```
+
+```{r}
+valid_responses$undertime <- ifelse(valid_responses$valid == "Undertime", 1, 0)
+valid_responses$incorrect <- ifelse(valid_responses$valid == "Very incorrect", 1, 0)
+```
+
+
+```{r}
+model = lm(Q4 ~ experiment_group_chr + undertime + incorrect, 
+           data = valid_responses[valid_responses$valid != "Missing outcome",])
+summary(model)
+coefci(model)
+```
