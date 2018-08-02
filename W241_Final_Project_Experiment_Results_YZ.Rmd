@@ -530,3 +530,38 @@ model = lm(Q4 ~ experiment_group_chr + undertime + incorrect,
 summary(model)
 coefci(model)
 ```
+
+```{r}
+table(valid_responses$valid, valid_responses$source_group)
+```
+
+```{r}
+model = lm(Q4 ~ experiment_group_chr*source_group, 
+           data = valid_responses[valid_responses$valid == "Valid",])
+summary(model)
+coefci(model)
+```
+
+```{r}
+model = lm(Q4 ~ experiment_group_chr, 
+           data = valid_responses[valid_responses$valid == "Valid" & valid_responses$source_group == "Mturk Masters",])
+summary(model)
+coefci(model)
+```
+
+
+```{r}
+model = lm(Q4 ~ experiment_group_chr, 
+           data = valid_responses[valid_responses$valid == "Valid" & valid_responses$source_group == "Mturk Regulars",])
+summary(model)
+coefci(model)
+```
+
+
+```{r}
+model = lm(Q4 ~ experiment_group_chr, 
+           data = valid_responses[valid_responses$valid == "Valid" & 
+                                    valid_responses$source_group == "F&F",])
+summary(model)
+coefci(model)
+```
