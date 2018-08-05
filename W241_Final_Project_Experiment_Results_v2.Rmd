@@ -4,9 +4,9 @@ subtitle: "W241 Final Project Experiment"
 author: "Jack Workman & Yulia Zamriy"
 date: \today 
 output:
-  # html_document: default
-  pdf_document: 
-    toc: true
+  html_document: default
+ pdf_document:
+   toc: true
 ---
 
 ```{r setup, include=FALSE}
@@ -163,7 +163,7 @@ We also confirmed that the story is relatively average. `Figure 1` shows a histo
  - gave the incorrect response to 2 or more reading comprehension questions
 
 
-```{r, fig.height = 4, fig.width = 4, fig.align="center", echo=FALSE}
+```{r, fig.height = 3, fig.width = 4, fig.align="center", echo=FALSE}
 hist(pilot[pilot$pass==1,]$Q4, 
      breaks = seq(0,7,1)-0.5,
      ylim = c(0,5),
@@ -646,7 +646,6 @@ se.model1 <- sqrt(diag(vcovHC(model1)))
 
 The second calculation method is with linear regression. Linear regression yields (`Table 7`) an estimated coefficient of `r round(model1$coefficients[2],2)` (robust std.error: `r round(se.model1[2],2)`) for the `Treat High` and `r round(model1$coefficients[3],2)` (robust std.error: `r round(se.model1[3],2)`) for the `Treat Low`. The Low group coefficient is highly statistically significant with a confidence interval of (`r round(model1$coefficients[3] + c(-1,1)*1.96*se.model1[3],2)`).
 
-\newpage
 ```{r echo=FALSE}
 stargazer(model1, type = "text", omit.stat = c("f", "rsq", "adj.rsq"), 
           se = list(se.model1),
