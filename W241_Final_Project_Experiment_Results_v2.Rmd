@@ -1,0 +1,769 @@
+---
+title: "Effect of User Reviews on Readers' Perceptions of a Short Story"
+subtitle: "W241 Final Project Experiment"
+author: "Jack Workman & Yulia Zamriy"
+date: \today 
+output:
+  # html_document: default
+  pdf_document: 
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# load packages
+library(lmtest) 
+library(knitr)
+library(kableExtra)
+library(data.table)
+library(tidyverse)
+library(stargazer)
+library(sandwich)
+library(lmtest)
+```
+
+# 1. Introduction
+
+## 1.1 Research Question
+
+This experiment seeks to answer the question, to what degree, if any, do reviews influence an individual's perception of a short story?
+
+## 1.2 Motivation
+
+Online reviews have become a strong force in determining business success. If you want to pick a restaurant for dinner, it is quite likely that you will check a few on Google Maps or Yelp to get other people's opinions. If you need to buy something on Amazon and there are multiple options, average score will probably be one of the main factors in your decision. What new movie should you watch tonight? It depends on Rotten Tomatoes score or New York Times review.
+
+However, the power of online reviews does not stop at the decision point. While eating a meal in a 5-star restaurant, will we persuade ourselves that it is worth all five stars even if it is not? After buying a standard plastic storage bin on Amazon with a review score of 3.5 (because somehow perfectly-reviewed bins do not exist), are we going to consider it good-enough but not great despite it being completely functional? If our friends make us watch a poorly reviewed movie, will we find reasons to justify the low score and ignore the good parts of the film?
+
+Are we so reliant on strangers' opinions that it is hard to form our own independent views about consumed products? If we find enough evidence to support this hypothesis, the implications for businesses are considerable. Boosting product reviews would not only drive short-term product sales, but also might help with repeat purchases from "satisfied" consumers.
+
+However, if we find no evidence of consumer compliance to public opinion, it might give us a glimpse of hope that we still can be independent thinkers.
+
+# 2. Experiment Design
+
+## 2.1 Hypothesis
+
+The null hypothesis of our experiment is that the average review score of the short story is not relevant to the respondent's review.
+
+The alternative hypothesis is that the average review score of the short story is a significant factor of determining respondent's review (the higher the average review the higher the respondent's score and vice versa).
+
+## 2.2 Methodology
+
+This experiment was conducted via a Qualtrics online survey. The survey consisted of the following:
+
++ Brief explanation of what to expect
++ Short story (about 5-minute read)
++ Prompt for user to rate the story (on 1 to 6 scale)
++ Questions to assess reader's comprehension of the story
++ Question to determine if the responder is familiar with the story
+
+The goal was to, first and foremost, collect the reader's opinion of the story. The additional questions at the end exist to (1) double-check that the user actually read the story and (2) detect any pre-existing bias from the participant. We also added a timer to the short story page to detect any participants who skipped the story.
+
+The survey can be viewed [here](https://berkeley.qualtrics.com/jfe/form/SV_5sPNhUpP0zlBssR).
+
+## 2.3 Treatment
+
+The treatment consisted of a prominently displayed average rating of the story as well as several user reviews gathered from the pilot. The displayed rating took place on the survey page directly before the short story.
+
+The exact rating of the treatment was varied to detect effects in either direction. This resulted in three distinct experimental groups:
+
+1. Control: no average review provided. The users are supposed to rate the story without any external influences.
+2. Treatment #1: display high rating (5 out of 6 stars)
+3. Treatment #2: display low rating (2 out of 6 stars)
+
+A scale of 6 stars was chosen to avoid giving the participant a middle value. By choosing a scale with an even number of options, the participants are forced to make a conscious decision on whether the story is above average (4 out of 6 stars) or below average (3 out of 6 stars).
+
+## 2.4 Randomization
+
+Randomization of assigned treatment was implemented as part of the Qualtrics survey. When accessing the survey, Qualtrics randomly assigns each participant to one of the experimental groups and showed him/her the appropriate rating (or no rating if in control). Qualtrics also ensured that participants were equally distributed across groups.
+
+## 2.5 The Story
+
+The same short story was used for all participants. The story was selected from a science fiction short story website that accepts and publishes short stories. This website has a "random short story" feature that will navigate the user to a random story in its collection. This feature and site were used to ensure that no bias existed in the selection of the story and as a means of selecting a hopefully obscure story.
+
+The story's author gave permission for the use of his story in this experiment.
+
+The story can be viewed [here](http://dailysciencefiction.com/hither-and-yon/alternative-history/zachary-morgan-brett/tusks-trunks-and-time-travel).
+
+## 2.6 Subject Recruitment
+
+Subjects were recruited from personal connections and from Amazon's Mechanical Turk.
+
+# 3. Experiment Results
+
+## 3.1 Pilot
+
+
+```{r include=FALSE}
+library(pwr)
+library(tidyverse)
+
+# load raw pilot data
+pilot <- read.csv("Pilot results/W241 Final Project Survey - Control_July 17, 2018_07.21.csv",
+                  skip = 3, header = FALSE, stringsAsFactors = FALSE)
+headers <- read.csv("Pilot results/W241 Final Project Survey - Control_July 17, 2018_07.21.csv",
+                  nrows = 1)
+colnames(pilot) <- colnames(headers)
+
+# reading comprehension questions
+pilot$Q8_correct <- pilot$Q8==2
+pilot$Q6_correct <- pilot$Q6==3
+pilot$Q7_correct <- pilot$Q7==3
+
+# bot-check: at least one question should be answered correctly
+pilot$n_correct_answers <- pilot$Q8_correct + pilot$Q6_correct + pilot$Q7_correct
+# bot-check: it should take a normal person at least 60sec to read the story
+pilot$Duration_gt_60sec <- ifelse(pilot$Q2_Page.Submit < 60, 0, 1)
+# load preprocessed pilot reviews 
+# preprocessing = flagging bot-like responses
+Q5_rating <- read.csv("Pilot results/Pilot_Q5.csv")
+pilot <- merge(pilot, Q5_rating[,c("mTurkCode","Q5_rating")], by = "mTurkCode")
+
+# putting it all together
+pilot$pass <- (pilot$Q2_Page.Submit >= 60) & (pilot$Q5_rating > 0) & (pilot$n_correct_answers > 0)+0
+
+
+# Power calculation parameters:
+ate <- 1.0 # effect size (treatment 1 vs. control or treatment 2 vs. control)
+sigma <- sd(pilot[pilot$pass==1,]$Q4, na.rm = TRUE) # standard deviation
+alpha <- 0.05
+beta <- 0.1 # 1-power
+
+```
+
+We conducted a pilot study prior to launching our main experiment. It covered only the control version of the survey and was designed to:
+
+1. Test the survey's readiness
+2. Gather data to determine the necessary sample size to ensure adequate experimental power
+3. Determine average rating that would be appropriate for treatment groups
+
+From the pilot's results, we determined that adequate statistical power would come from a sample size of at least size 42. The following parameters were used for this calculation:
+
+ - Desired effect size: `r ate` (difference in average score between treatment and control groups)
+ - Standard deviation in the pilot study: `r round(sigma,2)`
+ - Alpha: `r alpha`
+ - Power: `r 1-beta`
+
+```{r}
+# Built-in formula
+d = ate/sigma # assuming sigma is pooled standard deviation (equal variance)
+pwr.t.test(d = d, 
+           sig.level = alpha, 
+           power = 1-beta, 
+           type = 'two.sample', 
+           alternative = 'greater')
+```
+
+
+Based on pilot outcome, we made several tweaks to our survey like (1) explicitly requesting that the participants read the entire story and answer all of the questions and (2) easier reading comprehension questions as many participants failed to answer them correctly.
+
+We also confirmed that the story is relatively average. `Figure 1` shows a histogram of the ratings collected from the pilot after removing the responses where participants did not satisfy our valid response criteria:
+
+ - spent less than 60 seconds reading the short story and
+ - gave the incorrect response to 2 or more reading comprehension questions
+
+
+```{r, fig.height = 4, fig.width = 4, fig.align="center", echo=FALSE}
+hist(pilot[pilot$pass==1,]$Q4, 
+     breaks = seq(0,7,1)-0.5,
+     ylim = c(0,5),
+     cex.axis = 0.5, cex.lab = 0.7,  cex.main = 0.8,
+     col = "darkblue", 
+     xlab = "Rating", ylab = "Number of responses",
+     main = "Figure 1. Histogram of Story Ratings from Pilot")
+```
+
+```{r, include=FALSE}
+rm(list=ls())
+```
+
+
+Three rounds of survey requests were issued on *Mechanical Turk*:
+
+ 1. For the pilot study and asked for 50 responses. All 50 were given. 
+ 2. For the experiment, required a Masters qualification, and asked for 300 responses. Roughly 40 were returned. 
+ 3. For the experiment, did not require a Masters qualification, and asked for 300 responses. All 300 were provided.
+
+## 3.2. Experiment Data
+
+### 3.2.1 Data Sources
+
+For our main experiment survey responses were sourced from three different environments:
+
+1. Amazon Mechanical Turk with Masters qualification
+2. Amazon Mechanical Turk without Masters qualification
+3. Friends & Family (Facebook, LinkedIn, I School Slack)
+
+All survey responses were returned to us via Qualtrics. We were able to distinguish which response belonged to which group thanks to requiring the Mechanical Turk workers to input a code generated by our survey after survey completion. We later joined the datasets together and assigned each participant to their respective group. `Table 1` shows the number of responses receveived from each group.
+
+
+```{r load_data, include=FALSE}
+# Load Mturk responses 
+mturk_masters = 
+  read.csv("experiment_results/mturk_W241_Final-Project_Survey_Masters-Batch_Results.csv")
+mturk_regulars = 
+  read.csv("experiment_results/mturk_W241_Final-Project_Survey_Non-Masters-Batch_Results.csv")
+
+# load Qualtrics response
+all_content = 
+  readLines("experiment_results/qualtrics_W241_Final-Project_Survey_Experiment_August-1-2018_14-06.csv")
+# first 3 rows are meta data (not responses)
+all_content = all_content[-3]
+all_content = all_content[-2]
+qualtrics = read.csv(textConnection(all_content), header = TRUE, stringsAsFactors = FALSE)
+rm(all_content)
+# thank you: https://stackoverflow.com/questions/15860071/read-csv-header-on-first-line-skip-second-line
+
+# Concatenate MTurk Masters & MTurk Regulars
+mturk_masters['source_group'] = 1 
+mturk_regulars['source_group'] = 2
+mturk_all = rbind(mturk_masters, mturk_regulars)
+
+# drop unnecessary columns
+mturk_all = subset(mturk_all, select = -c(HITTypeId, Title, Description, Keywords, 
+                                          Reward, MaxAssignments, RequesterAnnotation, 
+                                          AssignmentDurationInSeconds, AutoApprovalDelayInSeconds, 
+                                          NumberOfSimilarHITs, LifetimeInSeconds, AssignmentId, 
+                                          AutoApprovalTime, ApprovalTime, RejectionTime, 
+                                          RequesterFeedback, Approve, Reject))
+
+# rename mTurkCode column to match qualtrics
+mturk_all['mTurkCode'] = mturk_all['Answer.surveycode']
+
+# Merge MTurk and Qualtrics Datasets
+responses = merge(x = qualtrics, y = mturk_all, by = "mTurkCode", all.x = TRUE)
+
+# responses that don't match Mturk are from Friends and Family
+responses$source_group[is.na(responses$source_group)] = 3
+
+# create a factor variable to indicate response source
+responses$source_group <- factor(responses$source_group, 
+                                 labels = c("Mturk Masters", "Mturk Regulars", "F&F"))
+source_group <- data.frame(table(responses$source_group))
+colnames(source_group) <- c("Source", "Count")
+```
+
+
+```{r echo=FALSE}
+kable(source_group, booktabs = TRUE) %>% 
+  kable_styling(font_size = 9, full_width = FALSE) %>% 
+  add_header_above(bold = TRUE, c("Table 1. Responses by Source Group"=2))
+```
+
+```{r include=FALSE}
+rm(list = c('mturk_all', 'mturk_masters', 'mturk_regulars', 'qualtrics', 'source_group'))
+```
+
+```{r include=FALSE}
+# creating clear labels for treatment groups
+responses['experiment_group'] = 
+  ifelse(responses$FL_2_DO == 'Introduction:Control', 1, 
+         ifelse(responses$FL_2_DO == 'Introduction:1Star', 2,
+                ifelse(responses$FL_2_DO == 'Introduction:4.5Stars', 3, -1)))
+responses['treated'] = ifelse(responses$experiment_group == 2, 1,
+                                    ifelse(responses$experiment_group == 3, 1, 0))
+responses['treatment_rating'] = ifelse(responses$experiment_group == 2, 2,
+                                       ifelse(responses$experiment_group == 3, 5, NA))
+responses['experiment_group_chr'] = 
+  ifelse(responses$FL_2_DO == 'Introduction:Control', "Control", 
+         ifelse(responses$FL_2_DO == 'Introduction:1Star', "Treat: Low",
+                ifelse(responses$FL_2_DO == 'Introduction:4.5Stars', "Treat: High", "NA")))
+```
+
+### 3.2.2. Identifying Invalid Responses
+
+```{r include=FALSE}
+# reading time analysis
+short_story_word_count = 990
+duration_secs_minimum = 60
+correct_answers_minimum = 1
+```
+
+Unfortunately, about have of 519 responses had to be flagged as invalid. Our criteria for an invalid response is as follows:
+
++ `Status` = 'Spam' or 'Survey Preview'
++ Not finished (progress less than 100%). We will remove these from the analysis because they contain no responses to any questions
++ Duplicate `IPAddress` occurance. We drop duplicate responses among `Mturk` responders (high likelihood of fraud), but keep them for 'Friends and Family' as members of the same household could use the same computer. However, this potentially could result in a spill-over effect
++ Time spent reading the story < 60 secs. This experiment relies entirely on the assumption that the subjects read the short story. To ensure this, we added a timer to track how long each participant spends on the short story page itself. The short story is `r short_story_word_count` words long, so any subject with less than `r duration_secs_minimum` seconds, a reading speed of `r round(short_story_word_count / duration_secs_minimum * 60, 2)` wpm will be dropped. Given that [the adult average reading speed is about 200 wpm](https://en.wikipedia.org/wiki/Words_per_minute#Reading_and_comprehension), we believe that this is more than justified. 
++ Less than 2 reading comprehension questions answered correctly. The survey contains three reading comprehension questions to test the reader's understanding of the story. These questions are designed to be extremely basic and high-level. In fact, the questions were made easier after the pilot as those were deemed to be too difficult. If the subject read the story, then they should be able to answer these questions. Since no one is perfect, we are electing to include in the analysis only the subjects that answered at least `r correct_answers_minimum` question correctly.
+
+`Figure 2` shows how many survey responses were dropped and for which reasons.
+
+```{r, include=FALSE}
+# create an flag for valid responses
+responses$valid <- "Valid"
+responses[responses$Status %in% c("Spam", "Survey Preview"), ]$valid <- "Preview/Spam"
+responses[responses$Progress < 100,]$valid <- "Not Finished"
+
+# exclude responses that didn't answer the main outcome quesiton
+responses[!is.na(responses$Q4) & responses$Q4 == -99,]$valid <- "Missing outcome"
+
+# remove unfinished/spam/preview
+responses2 = subset(responses, valid == "Valid")
+
+# record duplicate IP Addresses and first timestamp
+responses2 %>% 
+  group_by(IPAddress) %>% 
+  arrange(StartDate) %>% 
+  summarize(ip_count = n(),
+            StartDate = first(StartDate)) %>% 
+  filter(ip_count > 1) -> duplicate_ips
+
+# merge duplicate IP Addresses based on first time stamp
+responses2 <- merge(x = responses2, y = duplicate_ips, 
+               by = c("IPAddress", "StartDate"), all.x = TRUE)
+# merge all duplicate IP Addresses
+responses2 <- merge(x = responses2, y = duplicate_ips[,c("IPAddress", "ip_count")], 
+               by = "IPAddress", all.x = TRUE)
+
+# create a dummy for all responses from duplicate IPs
+responses2$duplicate_ip <- 0
+responses2[!is.na(responses2$ip_count.y),]$duplicate_ip <- 1
+
+# exclude first response from the duplicate id dummy
+responses2$duplicate_ip_xfirst <- 0
+responses2[!is.na(responses2$ip_count.x),]$duplicate_ip_xfirst <- 1
+
+# create a variable of the count of reponses coming from the IP address
+responses2$ip_count.x <- NULL
+colnames(responses2)[colnames(responses2)=="ip_count.y"] <- "ip_count"
+responses2[is.na(responses2$ip_count),]$ip_count <- 1
+rm(duplicate_ips)
+
+# delete duplicate responses from Mturk
+responses2[responses2$duplicate_ip_xfirst==1 & responses2$source_group != "F&F",]$valid <- "Duplicate"
+
+# final analysis dataset
+valid_responses = subset(responses2, valid == "Valid")
+
+# reading time check
+valid_responses$undertime <- ifelse(valid_responses$Q2_Page.Submit < duration_secs_minimum, 1, 0)
+valid_responses[valid_responses$undertime==1,]$valid <- "Undertime/Failed RC"
+
+# reading questions check
+valid_responses['Q12_correct'] = ifelse(valid_responses$Q12 == 'Beautiful', 1, 0)
+valid_responses['Q14_correct'] = ifelse(valid_responses$Q14 == 'Rome', 1, 0)
+valid_responses['Q16_correct'] = ifelse(valid_responses$Q12 == 'Gaius was killed', 1, 0)
+
+# count of correct responses
+valid_responses['correct_answers'] = valid_responses$Q12_correct + 
+  valid_responses$Q14_correct + valid_responses$Q16_correct
+
+# flag responses with 0 questions answered correctly
+valid_responses$failed_rc <- ifelse(valid_responses$correct_answers < correct_answers_minimum, 1, 0)
+valid_responses[valid_responses$failed_rc==1,]$valid <- "Undertime/Failed RC"
+
+# flag responses that came from the same IP address:
+valid_responses$issues <- "No issues"
+valid_responses[valid_responses$duplicate_ip==1,]$issues <- "Other Issues"
+
+# flag responses that claimed that they know the story
+valid_responses$know_story <- ifelse(valid_responses$Q25 == 'Yes', 1, 0)
+valid_responses[valid_responses$know_story==1,]$issues <- "Other Issues"
+
+# flag responses that missed at least one question:
+valid_responses$missing_answers <- 0
+valid_responses[valid_responses$Q5 == '-99',]$missing_answers <- 1
+valid_responses[valid_responses$Q25 == '-99',]$missing_answers <- 1
+valid_responses[valid_responses$Q12 == '-99',]$missing_answers <- 1
+valid_responses[valid_responses$Q14 == '-99',]$missing_answers <- 1
+valid_responses[valid_responses$Q16 == '-99',]$missing_answers <- 1
+valid_responses[valid_responses$missing_answers==1,]$issues <- "Other Issues"
+```
+
+
+```{r, include=FALSE}
+# Assembling the waterfall chart
+invalid0 <- sum(valid_responses$undertime==0 &
+                valid_responses$failed_rc==0) 
+invalid1 <- sum(valid_responses$undertime==1 &
+                valid_responses$failed_rc==0) 
+invalid2 <- sum(valid_responses$undertime==1 &
+                valid_responses$failed_rc==1) +
+            sum(valid_responses$undertime==0 &
+                valid_responses$failed_rc==1) 
+
+issues <- sum(valid_responses$undertime==1 &
+                valid_responses$failed_rc==1 &
+                valid_responses$duplicate_ip==1 &
+                (valid_responses$know_story==1 |
+                valid_responses$missing_answers==1)) 
+
+nrows_raw <- nrow(responses)
+excl_dups_unfinished <- nrow(valid_responses)
+excl_dur_undertime <- excl_dups_unfinished - invalid1
+excl_incorrect_answ <- excl_dur_undertime - invalid2
+nrows_final <- sum(valid_responses$valid == 'Valid')
+additional_issues <- nrows_final - issues
+
+labels = c('Raw Num\nResponses', 
+           'Unfinished/\nMturk Duplicate IPs',
+           sprintf('Reading Duration\n>= %s secs', duration_secs_minimum), 
+           sprintf('Num Correct\nAnswers < %s', correct_answers_minimum), 
+           'Know Story/Other*', 
+           'Final Count')
+
+desc = factor(labels, levels=labels)
+Type = c('Raw', 'Invalid', 'Invalid', 'Invalid', 'Valid', 'Valid')
+Type = factor(Type, levels = c("Invalid", "Raw", "Valid"))
+
+start = c(0, nrows_raw, 
+          excl_dups_unfinished, 
+          excl_dur_undertime, 
+          excl_incorrect_answ, 
+          nrows_final)
+end = c(nrows_raw, 
+        excl_dups_unfinished, 
+        excl_dur_undertime, 
+        excl_incorrect_answ, 
+        additional_issues, 0)
+amount = c(nrows_raw, 
+           -excl_dups_unfinished, 
+           -excl_dur_undertime, 
+           -excl_incorrect_answ, 
+           -nrows_final, 
+           -nrows_final)
+id = seq_along(amount)
+waterfall_data = data.frame(id, desc, Type, start, end, amount)
+
+label_names <- c(nrows_raw, 
+                 nrows_raw - excl_dups_unfinished,
+                 invalid1,
+                 invalid2,
+                 issues,
+                 nrows_final)
+
+adj <- 1.075
+label_pos <- c(nrows_raw * adj, 
+               excl_dups_unfinished * adj,
+               excl_dur_undertime * adj,
+               excl_incorrect_answ * adj,
+               additional_issues * adj,
+               nrows_final * adj)
+
+waterfall_plot = 
+  ggplot(waterfall_data, aes(desc, fill = Type, 
+                             xmin = id - 0.45, xmax = id + 0.45, ymin = end, ymax = start, 
+                             label = label_names)) + 
+  geom_rect()
+
+```
+
+```{r, fig.height = 5, fig.width = 8, fig.align="center", echo=FALSE}
+waterfall_plot + 
+  ggtitle("Figure 2. Validity of Survey Responses") + 
+  labs(y="Number of Responses", x="Issue Description") +
+  geom_text(aes(y = label_pos, label = label_names)) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5, size = 12), 
+        axis.text.x = element_text(angle = 30, hjust = 1)) + 
+  NULL
+```
+
+```{r, echo=FALSE}
+rm(list = c("adj", "amount", "desc", "end", "id", "label_names", "label_pos", "labels", "start", "Type"))
+# rm(list = c("excl_dups_unfinished", "excl_dur_undertime", "excl_incorrect_answ"))
+# rm(list = c("additional_issues", "nrows_final", "nrows_raw"))
+# rm(list = c("correct_answers_minimum", "duration_secs_minimum", "short_story_word_count"))
+rm(list = c("waterfall_data", "waterfall_plot"))
+# rm(list = c("invalid0", "invalid1", "invalid2", "issues"))
+```
+
+### 3.2.3. Balance Checks for Invalid Responses
+
+
+There are three distinct groups in this experiment:
+
+1. Control
+2. Treatment - Low Rating
+3. Treatment - High Rating
+
+In this section, we will check if responses marked as invalid were fairly distributed across the above three groups.
+
+Qualtrics was allocation surverys at random order to the above three groups. As we can see from `Table 2` there was some slight inbalance as `Treat: Low` received a bit lower than fair share of responses. We'll assume it's due to random noise.
+
+```{r echo=FALSE}
+group <- table(responses$experiment_group_chr)
+group <- rbind(group, 
+               round(group/nrow(responses),2))
+rownames(group) <- c("Responses", "Percent")
+kable(group, booktabs = TRUE) %>% 
+  kable_styling(font_size = 9, full_width = FALSE) %>% 
+  add_header_above(bold = TRUE, c("", "Table 2. Qualtrics Treatment Group Assignment"=3))
+```
+
+As indicated in `Figure 2` we dropped `r nrows_raw-excl_dups_unfinished` responses because they either did not finish the entire survey or did not answer the main question. `Table 3` checks distribution of these responses across treatment groups. The only issue that stands out is that unproportionally low number of unfinished surveys were in `Treat: Low` group, but it's consistent with the fact that Qualtrics allocation was not even. 
+
+
+```{r echo=FALSE}
+unfinished <- table(responses$valid, responses$experiment_group_chr)
+unfinished <- rbind(unfinished[1:2,1:3], table(responses2$valid, responses2$experiment_group_chr))
+rownames(unfinished) <- c("Missing outcome", "Not Finished",  "Duplicate IP", "Valid")
+kable(unfinished, booktabs = TRUE) %>% 
+  kable_styling(font_size = 9, full_width = FALSE) %>% 
+  add_header_above(bold = TRUE, c("", "Table 3. Unfinished Surveys Balance Check"=3))
+```
+
+After we drop `r nrows_raw-excl_dups_unfinished` responses, we exclude `r invalid1+invalid2` cases that either spent less than `r duration_secs_minimum` seconds on the survey or did not answer at least `r correct_answers_minimum` reading comprehension question correctly. The distribution of responses across groups is consistent with the original allocation by Qualtrics (`Table 4`)
+
+```{r echo=FALSE}
+valid <- table(valid_responses$valid, valid_responses$experiment_group_chr)
+valid <- rbind(valid, 
+               round(valid[c(2,4,6)]/sum(valid[c(2,4,6)]),2))
+rownames(valid)[3] <- "Percent"
+kable(valid, booktabs = TRUE) %>% 
+  kable_styling(font_size = 9, full_width = FALSE) %>% 
+  add_header_above(bold = TRUE, c("", "Table 4. Valid Responses Balance Check"=3))
+```
+
+The last check is to see how valid responses were distributed across source groups (`Table 5`). Interestingly enough, `Treat: Low` group has more responses in the `Friends and Family` group compared to `Treat: High` and `Control`. We don't have a strong hypothesis to explain this inconsistency and we'll assume that it's random.
+
+```{r echo=FALSE}
+source <- table(valid_responses[valid_responses$valid=="Valid",]$source_group,
+                valid_responses[valid_responses$valid=="Valid",]$experiment_group_chr)
+kable(source, booktabs = TRUE) %>% 
+  kable_styling(font_size = 9, full_width = FALSE) %>% 
+  add_header_above(bold = TRUE, c("", "Table 5. Source Balance Check"=3))
+```
+
+
+# 4. Experiment Outcome
+
+Our final analysis sample consists of `r invalid0` valid responses. However, we will check if including invalid responses impacts the results.
+
+## 4.1 Outcome Distribution
+
+Before calculating ATE as a difference in average rating across treatment groups, we will check the distribution of this variable. 
+
+Responders had to rate the story on a scale from 1 to 6. We decided to use even scale to make responders pick a side instead of providing a neutral response. Based on `Figure 3a` for `Control` group, average rating without any treatment was above 3.5 (expected average). This indicates that the story was slightly better than average. 
+
+`Treat High` group had the highest proportion of 5-star ratings, but it was not enough to increase group's average rating compared to the `Control` group. `Treat Low` group, on the other hand, had lower average rating compared to two other groups.
+
+```{r, fig.height = 4, fig.width = 10, fig.align="center", echo=FALSE}
+avg_c <- mean(valid_responses[valid_responses$valid=='Valid' & valid_responses$experiment_group==1,]$Q4)
+avg_t1 <- mean(valid_responses[valid_responses$valid=='Valid' & valid_responses$experiment_group==2,]$Q4)
+avg_t2 <- mean(valid_responses[valid_responses$valid=='Valid' & valid_responses$experiment_group==3,]$Q4)
+
+par(mfrow=c(1,3))
+hist(valid_responses[valid_responses$valid=='Valid' & valid_responses$experiment_group==1,]$Q4, 
+     breaks = seq(0,8,1)-0.5,
+     ylim = c(0,40), xlim = c(0,8),
+     cex.axis = 1, cex.lab = 1,  cex.main = 1,
+     col = "darkblue", 
+     xlab = "Rating", ylab = "Number of responses",
+     main = "Figure 3a. Control: Rating Distribution")
+abline(v=avg_c, col = 'red', lty = 3, lwd = 3)
+legend(0, 40, legend=c("Average Rating"),
+       col=c("red"), lty=3, cex=1, lwd = 3)
+hist(valid_responses[valid_responses$valid=='Valid' & valid_responses$experiment_group==2,]$Q4, 
+     breaks = seq(0,8,1)-0.5,
+     ylim = c(0,40), xlim = c(0,8),
+     cex.axis = 1, cex.lab = 1,  cex.main = 1,
+     col = "darkgreen", 
+     xlab = "Rating", ylab = "Number of responses",
+     main = "Figure 3b. Treat Low: Rating Distribution")
+abline(v=avg_t1, col = 'red', lty = 3, lwd = 3)
+legend(0, 40, legend=c("Average Rating"),
+       col=c("red"), lty=3, cex=1, lwd = 3)
+hist(valid_responses[valid_responses$valid=='Valid' & valid_responses$experiment_group==3,]$Q4, 
+     breaks = seq(0,8,1)-0.5,
+     ylim = c(0,40), xlim = c(0,8),
+     cex.axis = 1, cex.lab = 1,  cex.main = 1,
+     col = "darkorange", 
+     xlab = "Rating", ylab = "Number of responses",
+     main = "Figure 3c. Treat High: Rating Distribution")
+abline(v=avg_t2, col = 'red', lty = 3, lwd = 3)
+legend(0, 40, legend=c("Average Rating"),
+       col=c("red"), lty=3, cex=1, lwd = 3)
+```
+
+## 4.2 Average Treatment Effect
+
+### 4.2.1 Manual Calculation
+
+We calculated the effect of the treatment with two different methods. The first is with a standard estimated ATE calculation. The results can be seen in `Table 6`.
+
+The average control rating `r round(avg_c, 2)`. The average low rating was `r round(avg_t1,2)`. The average high rating was `r round(avg_t2,2)`. As you can see, the largest effect (in absolute terms) was caused by the low rating treatment. Interestingly, the average high rating is slightly lower than the average control. These results suggest that users are significantly more influenced by lower reviews than high ones.
+
+```{r include=FALSE}
+calc_exp_group_avg_rating = function(data, group) {
+  avg_rating = mean(subset(data, experiment_group == group)$Q4)
+  return(avg_rating)
+}
+get_nrow_of_group = function(data, group) {
+  rows = nrow(subset(data, experiment_group == group))
+  return(rows)
+}
+get_pct_subjects_of_group = function(data, group) {
+  count = get_nrow_of_group(data, group)
+  pct = round(count / nrow(data) * 100, 2)
+  return(pct)
+}
+control_avg_rating = calc_exp_group_avg_rating(valid_responses[valid_responses$valid == "Valid",], 1)
+treatment_low_avg_rating = calc_exp_group_avg_rating(valid_responses[valid_responses$valid == "Valid",], 2)
+treatment_high_avg_rating = calc_exp_group_avg_rating(valid_responses[valid_responses$valid == "Valid",], 3)
+ate_high = treatment_high_avg_rating - control_avg_rating
+ate_low = treatment_low_avg_rating - control_avg_rating
+groups = c(
+  'Control',
+  'Treatment - Low Rating',
+  'Treatment - High Rating')
+counts = c(
+  get_nrow_of_group(valid_responses[valid_responses$valid == "Valid",], 1),
+  get_nrow_of_group(valid_responses[valid_responses$valid == "Valid",], 2),
+  get_nrow_of_group(valid_responses[valid_responses$valid == "Valid",], 3))
+pcts = c(
+  get_pct_subjects_of_group(valid_responses[valid_responses$valid == "Valid",], 1),
+  get_pct_subjects_of_group(valid_responses[valid_responses$valid == "Valid",], 2),
+  get_pct_subjects_of_group(valid_responses[valid_responses$valid == "Valid",], 3))
+avg_ratings = c(
+  round(control_avg_rating,2),
+  round(treatment_low_avg_rating,2),
+  round(treatment_high_avg_rating,2))
+ates = c(
+  0,
+  round(ate_low,2),
+  round(ate_high,2))
+treated_ratings = c('NA', '2/6 Stars', '5/6 Stars')
+outcome_table = data.frame(groups, counts, pcts, treated_ratings, avg_ratings, ates)
+```
+
+```{r echo=FALSE}
+kable(outcome_table, col.names = 
+        c('Group', '# of Subjects', '% of Total Subjects', 'Treated Rating', 'AVG Rating', 'ATE'),
+      booktabs = TRUE) %>% 
+  kable_styling(font_size = 9, full_width = FALSE) %>% 
+  add_header_above(bold = TRUE, c("", "Table 6. Average Treatment Effect"=5))
+```
+
+### 4.2.2 Regression Analysis
+
+```{r include=FALSE}
+model1 = lm(Q4 ~ experiment_group_chr, 
+           data = valid_responses[valid_responses$valid == "Valid",])
+se.model1 <- sqrt(diag(vcovHC(model1)))
+```
+
+The second calculation method is with linear regression. Linear regression yields (`Table 7`) an estimated coefficient of `r round(model1$coefficients[2],2)` (robust std.error: `r round(se.model1[2],2)`) for the `Treat High` and `r round(model1$coefficients[3],2)` (robust std.error: `r round(se.model1[3],2)`) for the `Treat Low`. The Low group coefficient is highly statistically significant with a confidence interval of (`r round(model1$coefficients[3] + c(-1,1)*1.96*se.model1[3],2)`).
+
+\newpage
+```{r echo=FALSE}
+stargazer(model1, type = "text", omit.stat = c("f", "rsq", "adj.rsq"), 
+          se = list(se.model1),
+          star.cutoffs = c(0.05, 0.01, 0.001),
+          no.space = TRUE, align = TRUE, 
+          dep.var.labels = "Average Rating",
+          covariate.labels = c("Treat: High", "Treat: Low"),
+          column.labels = "Valid Responses Only",
+          title = "Table 7. Regression Estimated ATE")
+```
+
+## 4.2.3 Regression Analysis and Invalid Responses
+
+Since we excluded a lot of responses due to serious validity issues, we want to check if including them changes our results. `Table 8` compared outputs of 3 models:
+
+ 1. Our main regression on 242 valid responses (same as `Table 7`)
+ 2. Same model specification but with all 427 responses included 
+ 3. Model with all 427 responses and additional controls for invalid responses
+
+```{r include=FALSE}
+model2 = lm(Q4 ~ experiment_group_chr, data = valid_responses)
+se.model2 <- sqrt(diag(vcovHC(model2)))
+
+model3 = lm(Q4 ~ experiment_group_chr + undertime + failed_rc, data = valid_responses)
+se.model3 <- sqrt(diag(vcovHC(model3)))
+```
+
+```{r echo=FALSE}
+stargazer(model1, model2, model3,
+          type = "text", omit.stat = c("f", "rsq", "adj.rsq"),
+          se = list(se.model1, se.model2, se.model3),
+          star.cutoffs = c(0.05, 0.01, 0.001),
+          no.space = TRUE, align = TRUE,
+          dep.var.labels = "Average Rating",
+          covariate.labels = c("Treat: High", "Treat: Low", 
+                               "Finished in < 60 sec", "Failed Reading Comprehension"),
+          column.labels = c("Valid Responses Only", "All Responses", "All Responses"),
+          title = "Table 8. Regression Estimated ATE")
+```
+
+Unfortunately, the results in `Table 8` indicate that:
+
+ - After including invalid responses the `Treat Low` effect is around 50% lower, but still statistically significant.
+ - Responders that failed all 3 reading comprehension questions had significantly lower average rating compared to other responders with coefficient `r round(model3$coefficients[5], 2)` (`r round(se.model3[5], 2)`). 
+
+However, if we check `Table 9` below, the majority of responders that failed reading comprehension were from `MTurk Regulars` group. Therefore, we can suggest two hypothesis for the above results:
+ 
+ 1. `MTurk Regulars` did not read the story carefully and, hence, did not have strong opinion on it. Then they picked the score that was closer to expected average rating
+ 2. `MTurk Regulars` did not read the story at all (potentially bots) and picked the score that was closer to expected average rating
+
+Regardless of the explanations, the results are still consistent: the impact of Low rating is statistically significant, while High ratings doesn't make people change their minds.
+
+```{r echo=FALSE}
+valid_responses %>% 
+  group_by(source_group, experiment_group_chr) %>% 
+  filter(failed_rc == 1) %>% 
+  summarize(count = n(),
+            q4 = round(mean(Q4),2)) -> failed
+failed <- dcast(setDT(failed), source_group ~ experiment_group_chr, value.var = c("count", "q4"))
+kable(failed,booktabs = TRUE, col.names = c("Source", "Control", "Treat: High", "Treat: Low",
+                      "Control", "Treat: High", "Treat: Low")) %>% 
+  kable_styling(font_size = 9, full_width = FALSE) %>% 
+  column_spec(1, bold = TRUE) %>%
+  column_spec(4, border_right = TRUE) %>%
+  add_header_above(bold = TRUE, 
+                   c("", "Response Count"=3, "Average Rating"=3)) %>% 
+  add_header_above(bold = TRUE, 
+                   c("", "Table 9. Number of Responders That Failed \nAll Reading Comprehension Questions"=6))
+```
+
+## 4.2.4 Source Group Results
+
+Another interesting hypothesis that we can test is whether results differ by source group (`Table 10`). 
+
+```{r include=FALSE}
+model4 = lm(Q4 ~ experiment_group_chr, 
+           data = valid_responses[valid_responses$valid == "Valid" & 
+                                    valid_responses$source_group == "Mturk Masters",])
+se.model4 <- sqrt(diag(vcovHC(model4)))
+
+model5 = lm(Q4 ~ experiment_group_chr, 
+           data = valid_responses[valid_responses$valid == "Valid" & 
+                                    valid_responses$source_group == "Mturk Regulars",])
+se.model5 <- sqrt(diag(vcovHC(model5)))
+
+model6 = lm(Q4 ~ experiment_group_chr, 
+           data = valid_responses[valid_responses$valid == "Valid" & 
+                                    valid_responses$source_group == "F&F",])
+se.model6 <- sqrt(diag(vcovHC(model6)))
+```
+
+```{r echo=FALSE}
+stargazer(model4, model5, model6,
+          type = "text", omit.stat = c("f", "rsq", "adj.rsq"),
+          se = list(se.model4, se.model5, se.model6),
+          star.cutoffs = c(0.05, 0.01, 0.001),
+          no.space = TRUE, align = TRUE,
+          dep.var.labels = "Average Rating",
+          covariate.labels = c("Treat: High", "Treat: Low"),
+          column.labels = c("Mturk Masters", "Mturk Regulars", "F&F"),
+          title = "Table 10. Regression Estimated ATE by Source Group")
+```
+
+There results suggest that:
+
+ - In none of the three groups `High` rating impacted people's opinions about the story (as compared to the `Control` group rating)
+ - In  `MTurk` groups `Low` rating was 0.8 to 1 lower than average `Control` group score. However, effect estimate for the `Masters` group is not statistically significant mostly due to low sample size
+ - For the `F&F` group, neither of the treatment made a difference. Their average ratings was statstically indistinguishable across all treatment and control groups
+ 
+It is hard to explain these results without knowing `MTurk` responders audience. However, we can speculate with high confidence that `Friends & Family` audience has higher education and employment levels than people who earn money on `MTurk`. That might influence how they read and perceive the story. And it might be that they are much better at forming and staying with their opinions.
+
+# 5. Discussion
+
+## 5.1 Potential Experimental Pitfalls
+
+## 5.2 Generalizability of Results
+
+## 5.3 Mediation of Results
+
+# 6. Conclusion
