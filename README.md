@@ -42,3 +42,7 @@ To what degree, if any, do reviews influence an individual’s perception of a s
  - Request on Mechanical Turk: 100 `master` responses to compensate for invalid responses
  - Power: 90%
  - Expected ATE: 1 point in score difference between each treamtment cell and control
+
+# Presentation
+
+https://docs.google.com/presentation/d/1XDyzgot4LlBdWGAnaCncjFQce3HdOwUuY-J44Uw8kfU/edit?usp=sharing
