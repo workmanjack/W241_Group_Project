@@ -4,9 +4,9 @@ subtitle: "W241 Final Project Experiment"
 author: "Jack Workman & Yulia Zamriy"
 date: \today 
 output:
-  html_document: default
  pdf_document:
    toc: true
+ html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -177,18 +177,11 @@ hist(pilot[pilot$pass==1,]$Q4,
 rm(list=ls())
 ```
 
-
-Three rounds of survey requests were issued on *Mechanical Turk*:
-
- 1. For the pilot study and asked for 50 responses. All 50 were given. 
- 2. For the experiment, required a Masters qualification, and asked for 300 responses. Roughly 40 were returned. 
- 3. For the experiment, did not require a Masters qualification, and asked for 300 responses. All 300 were provided.
-
 ## 3.2. Experiment Data
 
 ### 3.2.1 Data Sources
 
-For our main experiment survey responses were sourced from three different environments:
+For our main experiment, survey responses were sourced from three different environments:
 
 1. Amazon Mechanical Turk with Masters qualification
 2. Amazon Mechanical Turk without Masters qualification
@@ -279,7 +272,7 @@ duration_secs_minimum = 60
 correct_answers_minimum = 1
 ```
 
-Unfortunately, about have of 519 responses had to be flagged as invalid. Our criteria for an invalid response is as follows:
+Unfortunately, about half of the 519 responses had to be flagged as invalid. Our criteria for an invalid response is as follows:
 
 + `Status` = 'Spam' or 'Survey Preview'
 + Not finished (progress less than 100%). We will remove these from the analysis because they contain no responses to any questions
@@ -480,7 +473,7 @@ There are three distinct groups in this experiment:
 
 In this section, we will check if responses marked as invalid were fairly distributed across the above three groups.
 
-Qualtrics was allocation surverys at random order to the above three groups. As we can see from `Table 2` there was some slight inbalance as `Treat: Low` received a bit lower than fair share of responses. We'll assume it's due to random noise.
+Qualtrics allocated surverys at random order to the above three groups. As we can see from `Table 2` there was some slight inbalance as `Treat: Low` received a bit lower than fair share of responses. We'll assume it's due to random noise.
 
 ```{r echo=FALSE}
 group <- table(responses$experiment_group_chr)
@@ -492,7 +485,7 @@ kable(group, booktabs = TRUE) %>%
   add_header_above(bold = TRUE, c("", "Table 2. Qualtrics Treatment Group Assignment"=3))
 ```
 
-As indicated in `Figure 2` we dropped `r nrows_raw-excl_dups_unfinished` responses because they either did not finish the entire survey or did not answer the main question. `Table 3` checks distribution of these responses across treatment groups. The only issue that stands out is that unproportionally low number of unfinished surveys were in `Treat: Low` group, but it's consistent with the fact that Qualtrics allocation was not even. 
+As indicated in `Figure 2`, we dropped `r nrows_raw-excl_dups_unfinished` responses because they either did not finish the entire survey or did not answer the main question. `Table 3` checks the distribution of these responses across treatment groups. The only issue that stands out is that an unproportionally low number of unfinished surveys were in the `Treat: Low` group, but it is consistent with the fact that Qualtrics allocation was not even. 
 
 
 ```{r echo=FALSE}
@@ -504,7 +497,7 @@ kable(unfinished, booktabs = TRUE) %>%
   add_header_above(bold = TRUE, c("", "Table 3. Unfinished Surveys Balance Check"=3))
 ```
 
-After we drop `r nrows_raw-excl_dups_unfinished` responses, we exclude `r invalid1+invalid2` cases that either spent less than `r duration_secs_minimum` seconds on the survey or did not answer at least `r correct_answers_minimum` reading comprehension question correctly. The distribution of responses across groups is consistent with the original allocation by Qualtrics (`Table 4`)
+After we drop the `r nrows_raw-excl_dups_unfinished` responses, we exclude `r invalid1+invalid2` cases that either spent less than `r duration_secs_minimum` seconds on the survey or did not answer at least `r correct_answers_minimum` reading comprehension question correctly. The distribution of responses across groups is consistent with the original allocation by Qualtrics (`Table 4`)
 
 ```{r echo=FALSE}
 valid <- table(valid_responses$valid, valid_responses$experiment_group_chr)
@@ -516,7 +509,7 @@ kable(valid, booktabs = TRUE) %>%
   add_header_above(bold = TRUE, c("", "Table 4. Valid Responses Balance Check"=3))
 ```
 
-The last check is to see how valid responses were distributed across source groups (`Table 5`). Interestingly enough, `Treat: Low` group has more responses in the `Friends and Family` group compared to `Treat: High` and `Control`. We don't have a strong hypothesis to explain this inconsistency and we'll assume that it's random.
+The last check is to see how valid responses were distributed across source groups (`Table 5`). Interestingly enough, `Treat: Low` group has more responses in the `Friends and Family` group compared to `Treat: High` and `Control`. We do not have a strong hypothesis to explain this inconsistency and we will assume that it's random.
 
 ```{r echo=FALSE}
 source <- table(valid_responses[valid_responses$valid=="Valid",]$source_group,
@@ -535,9 +528,9 @@ Our final analysis sample consists of `r invalid0` valid responses. However, we 
 
 Before calculating ATE as a difference in average rating across treatment groups, we will check the distribution of this variable. 
 
-Responders had to rate the story on a scale from 1 to 6. We decided to use even scale to make responders pick a side instead of providing a neutral response. Based on `Figure 3a` for `Control` group, average rating without any treatment was above 3.5 (expected average). This indicates that the story was slightly better than average. 
+Responders had to rate the story on a scale from 1 to 6. We decided to use an even scale to force responders pick a side instead of providing a neutral response. Based on `Figure 3a` for `Control` group, average rating without any treatment was above 3.5 (expected average). This indicates that the story was slightly better than average. 
 
-`Treat High` group had the highest proportion of 5-star ratings, but it was not enough to increase group's average rating compared to the `Control` group. `Treat Low` group, on the other hand, had lower average rating compared to two other groups.
+`Treat High` group had the highest proportion of 5-star ratings, but it was not enough to increase the group's average rating compared to the `Control` group. `Treat Low` group, on the other hand, had a lower average rating compared to the other two groups.
 
 ```{r, fig.height = 4, fig.width = 10, fig.align="center", echo=FALSE}
 avg_c <- mean(valid_responses[valid_responses$valid=='Valid' & valid_responses$experiment_group==1,]$Q4)
@@ -583,7 +576,7 @@ legend(0, 40, legend=c("Average Rating"),
 
 We calculated the effect of the treatment with two different methods. The first is with a standard estimated ATE calculation. The results can be seen in `Table 6`.
 
-The average control rating `r round(avg_c, 2)`. The average low rating was `r round(avg_t1,2)`. The average high rating was `r round(avg_t2,2)`. As you can see, the largest effect (in absolute terms) was caused by the low rating treatment. Interestingly, the average high rating is slightly lower than the average control. These results suggest that users are significantly more influenced by lower reviews than high ones.
+The average control rating was `r round(avg_c, 2)`. The average low rating was `r round(avg_t1,2)`. The average high rating was `r round(avg_t2,2)`. As you can see, the largest effect (in absolute terms) was caused by the low rating treatment. Interestingly, the average high rating is slightly lower than the average control. These results suggest that users are significantly more influenced by lower reviews than high ones.
 
 ```{r include=FALSE}
 calc_exp_group_avg_rating = function(data, group) {
@@ -659,7 +652,7 @@ stargazer(model1, type = "text", omit.stat = c("f", "rsq", "adj.rsq"),
 
 ## 4.2.3 Regression Analysis and Invalid Responses
 
-Since we excluded a lot of responses due to serious validity issues, we want to check if including them changes our results. `Table 8` compared outputs of 3 models:
+Since we excluded a fair share of responses due to serious validity issues, we want to check if including them changes our results. `Table 8` compared outputs of 3 models:
 
  1. Our main regression on 242 valid responses (same as `Table 7`)
  2. Same model specification but with all 427 responses included 
@@ -693,10 +686,10 @@ Unfortunately, the results in `Table 8` indicate that:
 
 However, if we check `Table 9` below, the majority of responders that failed reading comprehension were from `MTurk Regulars` group. Therefore, we can suggest two hypothesis for the above results:
  
- 1. `MTurk Regulars` did not read the story carefully and, hence, did not have strong opinion on it. Then they picked the score that was closer to expected average rating
- 2. `MTurk Regulars` did not read the story at all (potentially bots) and picked the score that was closer to expected average rating
+ 1. `MTurk Regulars` did not read the story carefully and, hence, did not have strong opinion on it. They then picked the score that was closer to the expected average rating
+ 2. `MTurk Regulars` did not read the story at all (potentially bots) and picked the score that was closer to the expected average rating
 
-Regardless of the explanations, the results are still consistent: the impact of Low rating is statistically significant, while High ratings doesn't make people change their minds.
+Regardless of the explanations, the results are still consistent: the impact of Low ratings are statistically significant, while High ratings do not make people change their minds.
 
 ```{r echo=FALSE}
 valid_responses %>% 
@@ -749,20 +742,18 @@ stargazer(model4, model5, model6,
           title = "Table 10. Regression Estimated ATE by Source Group")
 ```
 
-There results suggest that:
+These results suggest that:
 
- - In none of the three groups `High` rating impacted people's opinions about the story (as compared to the `Control` group rating)
- - In  `MTurk` groups `Low` rating was 0.8 to 1 lower than average `Control` group score. However, effect estimate for the `Masters` group is not statistically significant mostly due to low sample size
- - For the `F&F` group, neither of the treatment made a difference. Their average ratings was statstically indistinguishable across all treatment and control groups
+ - In none of the three groups, the `High` rating impacted people's opinions about the story (as compared to the `Control` group rating)
+ - In  `MTurk` groups, the `Low` rating was 0.8 to 1 lower than the average `Control` group score. However, the effect estimate for the `Masters` group is not statistically significant mostly due to low sample size
+ - For the `F&F` group, neither of the treatments made a difference. Their average ratings were statstically indistinguishable across all treatment and control groups
  
 It is hard to explain these results without knowing `MTurk` responders audience. However, we can speculate with high confidence that `Friends & Family` audience has higher education and employment levels than people who earn money on `MTurk`. That might influence how they read and perceive the story. And it might be that they are much better at forming and staying with their opinions.
 
-# 5. Discussion
+# 5. Conclusion
 
-## 5.1 Potential Experimental Pitfalls
+After conducting a survey with the aim of measuring the impact of high and low numerical ratings on a reader's perception of a short story, we conclude that the evidence suggests readers are in fact influenced by negative reviews but not positive ones.
 
-## 5.2 Generalizability of Results
+How do the results of this experiment generalize to other industries and domains? In today's society, ratings and reviews seem to be everywhere. Most prominently, they can be found in the commerical sector on sites such as Amazon, Google, or Yelp. While a short story is not directly comparable to a movie or restaurant experience, we believe that the pyschological impact of seeing a review prior to the targeted event persists across these experiences.
 
-## 5.3 Mediation of Results
-
-# 6. Conclusion
+From a business perspective, the takeaway of this experiment is clear: avoid negative reviews. This is not particularly shocking as many might consider it common sense that a positive reputation is likely to lead to more customers. From an individual perspective, this experiment suggests that we can be unknowingly biased by negative reviews which is something to keep in mind while perusing Amazon for a new product or searching Yelp for your next meal.
