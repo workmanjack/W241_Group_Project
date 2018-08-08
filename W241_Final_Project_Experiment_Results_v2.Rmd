@@ -4,9 +4,9 @@ subtitle: "W241 Final Project Experiment"
 author: "Jack Workman & Yulia Zamriy"
 date: \today 
 output:
+ # html_document: default
  pdf_document:
    toc: true
- html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -391,7 +391,7 @@ additional_issues <- nrows_final - issues
 
 labels = c('Raw Num\nResponses', 
            'Unfinished/\nMturk Duplicate IPs',
-           sprintf('Reading Duration\n>= %s secs', duration_secs_minimum), 
+           sprintf('Reading Duration\n<= %s secs', duration_secs_minimum), 
            sprintf('Num Correct\nAnswers < %s', correct_answers_minimum), 
            'Know Story/Other*', 
            'Final Count')
@@ -614,7 +614,7 @@ avg_ratings = c(
   round(treatment_low_avg_rating,2),
   round(treatment_high_avg_rating,2))
 ates = c(
-  0,
+  '',
   round(ate_low,2),
   round(ate_high,2))
 treated_ratings = c('NA', '2/6 Stars', '5/6 Stars')
