@@ -4,9 +4,9 @@ subtitle: "W241 Final Project Experiment"
 author: "Jack Workman & Yulia Zamriy"
 date: \today 
 output:
- # html_document: default
  pdf_document:
    toc: true
+ # html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -77,7 +77,7 @@ The 5/6 and 2/6 ratings in the treatment groups have been chosen for their perce
 
 ## 2.4 Randomization
 
-Randomization of assigned treatment was implemented as part of the Qualtrics survey. When accessing the survey, Qualtrics randomly assigns each participant to one of the experimental groups and showed him/her the appropriate rating (or no rating if in control). Qualtrics also ensured that participants were equally distributed across groups.
+Randomization of assigned treatment was implemented as part of the Qualtrics survey. When accessing the survey, Qualtrics randomly assigns each participant to one of the experimental groups and shows him/her the appropriate rating (or no rating if in control). Qualtrics also promises that participants will be equally distributed across groups.
 
 ## 2.5 The Story
 
@@ -755,7 +755,9 @@ It is hard to explain these results without knowing `MTurk` responders audience.
 
 # 5. Conclusion
 
-After conducting a survey with the aim of measuring the impact of high and low numerical ratings on a reader's perception of a short story, we conclude that the evidence suggests readers are in fact influenced by negative reviews but not positive ones.
+After conducting a survey with the aim of measuring the impact of high and low numerical ratings on a reader's perception of a short story, we conclude that the evidence suggests readers are, in fact, influenced by negative reviews as statistical analysis of both a manual calculation and regression analysis of the treatment effect yielded a highly statistically significant coefficient of -0.68 stars (on a scale of 6 stars) for readers shown a low numerical rating prior to reading the short story. Positive reviews, on the other hand, appear to not be influential as no statistically significant relationship was found.
+
+There are several concerns worth noting alongside these results. First, we have some doubt on whether all participants actually read the story. To catch this potential escape, we built several controls into our experimental design including a reading timer and reading comprehension questions. Based on the data gathered from these controls, we invalidated about half of our responses - a regretfully large amount. To be sure that this did not negatively influence the accuracy of our results, we ran an additional regression on the full dataset comprised of invalid and valid responses (Section 4.2.3). The significance of the results, albeit with a smaller treatment effect, proved consistent. The second concern is uncertainty of the representativeness of the sample. The majority of our participants came from Amazon's Mechanical Turk, and we know little of their demographic and educational backgrounds. In Section 4.2.4, we explored the potential differences between our participant sources with a regression on each source's set of responses. The MTurk Masters source group sample size was too small to make any conclusions, the MTurk Regulars source group yielded the same observed significance level for negative reviews as the original analysis, and Friends & Family showed no treatment effect at all. This is potentially because Friends & Family were aware of the possibility of being treated while taking the survey. Ultimately, more experimentation is required to reach any further conclusions on the differences between these experimental groups.
 
 How do the results of this experiment generalize to other industries and domains? In today's society, ratings and reviews seem to be everywhere. Most prominently, they can be found in the commerical sector on sites such as Amazon, Google, or Yelp. While a short story is not directly comparable to a movie or restaurant experience, we believe that the pyschological impact of seeing a review prior to the targeted event persists across these experiences.
 
